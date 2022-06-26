@@ -72,50 +72,67 @@ reset:      sei                ; $c004: 78              Set Interrupt Flag
             ldx #$ff           ; $c006: a2 ff           cpu.X = 0xFF
             txs                ; $c008: 9a              cpu.push(cpu.X)
 
-wait1stVBlank:    lda PPUSTATUS               ; $c009: ad 02 20        cpu.A = ppu.Status
-                  bpl wait1stVBlank           ; $c00c: 10 fb           If vertical blank started, go next
+wait1stVBlank:      lda PPUSTATUS               ; $c009: ad 02 20        cpu.A = ppu.Status
+                    bpl wait1stVBlank           ; $c00c: 10 fb           If vertical blank started, go next
 
-wait2ndVBlank:      lda PPUSTATUS             ; $c00e: ad 02 20        cpu.A = ppu.Status
-                    bpl wait2ndVBlank         ; $c011: 10 fb           If vertical blank started, go next    
+wait2ndVBlank:      lda PPUSTATUS               ; $c00e: ad 02 20        cpu.A = ppu.Status
+                    bpl wait2ndVBlank           ; $c011: 10 fb           If vertical blank started, go next    
 
-            lda #$00           ; $c013: a9 00           cpu.A = 0x00
-            sta PPUCTRL        ; $c015: 8d 00 20        ppu.CTRL = cpu.A
-            sta PPUMASK        ; $c018: 8d 01 20        ppu.MASK = cpu.A
-            sta PPUSCROLL      ; $c01b: 8d 05 20        ppu.SCROLL = cpu.A
-            sta PPUSCROLL      ; $c01e: 8d 05 20        ppu.SCROLL = cpu.A
-            lda PPUSTATUS      ; $c021: ad 02 20        cpu.A = ppu.STATUS
-            ldx #$20           ; $c024: a2 20           .
-            stx PPUADDR        ; $c026: 8e 06 20        .
-            ldx #$00           ; $c029: a2 00           .
-            stx PPUADDR        ; $c02b: 8e 06 20        ppu.ADDR = 0x2000               // Let's write into NameTable
-            ldx #$00           ; $c02e: a2 00           cpu.X = 0x00
-            ldy #$0f           ; $c030: a0 0f           cpu.Y = 0x0F
-            lda #$00           ; $c032: a9 00           cpu.A = 0x00
+                    lda #$00           ; $c013: a9 00           cpu.A = 0x00
+                    sta PPUCTRL        ; $c015: 8d 00 20        ppu.CTRL = cpu.A
+                    sta PPUMASK        ; $c018: 8d 01 20        ppu.MASK = cpu.A
+                    sta PPUSCROLL      ; $c01b: 8d 05 20        ppu.SCROLL = cpu.A
+                    sta PPUSCROLL      ; $c01e: 8d 05 20        ppu.SCROLL = cpu.A
+                    lda PPUSTATUS      ; $c021: ad 02 20        cpu.A = ppu.STATUS
 
-__c034:     sta PPUDATA        ; $c034: 8d 07 20        for y = 0; y < 4080; y++ {
-            dex                ; $c037: ca                  ppu.DATA = cpu.A;           // Set all nametable to 0x00
-            bne __c034         ; $c038: d0 fa           .        
-            dey                ; $c03a: 88              .
-            bne __c034         ; $c03b: d0 f7           }
 
+;...........Set all nametable to 0x00
+                    ldx #$20           ; $c024: a2 20           .
+                    stx PPUADDR        ; $c026: 8e 06 20        .
+                    ldx #$00           ; $c029: a2 00           .
+                    stx PPUADDR        ; $c02b: 8e 06 20        ppu.ADDR = 0x2000        // Let's write into NameTable
+                    ldx #$00           ; $c02e: a2 00           cpu.X = 0x00             // counter for __c034 loop
+                    ldy #$0f           ; $c030: a0 0f           cpu.Y = 0x0F             // counter for __c034 loop
+                    lda #$00           ; $c032: a9 00           cpu.A = 0x00
+
+__c034:             sta PPUDATA        ; $c034: 8d 07 20        ppu.DATA = cpu.A;          
+                    dex                ; $c037: ca              decrement cpu.X    
+                    bne __c034         ; $c038: d0 fa           if result is not 0, go to __c034 
+                    dey                ; $c03a: 88              decrement cpu.Y
+                    bne __c034         ; $c03b: d0 f7           if result is not 0, go to __c034
+                                                                ; ----- alternative pseudo code ----
+                                                                ; for i = 0; i < 4080; i++ {
+                                                                ;     ppu.DATA = cpu.A (0x00)
+                                                                ; }
+
+
+;...........Copy palette indexes to PPU
             lda #$3f           ; $c03d: a9 3f           .
             sta PPUADDR        ; $c03f: 8d 06 20        .
             lda #$00           ; $c042: a9 00           .
-            sta PPUADDR        ; $c044: 8d 06 20        ppu.ADDR = 0x3F00               // Set palette indexes
+            sta PPUADDR        ; $c044: 8d 06 20        ppu.ADDR = 0x3F00
             ldx #$00           ; $c047: a2 00           cpu.x = 0x00        
-                                                        // Copy palette indexes to PPU
-__c049:     lda __ff78,x       ; $c049: bd 78 ff        do{
-            sta PPUDATA        ; $c04c: 8d 07 20            cpu.A = $0xFF78 + cpu.X         
-            inx                ; $c04f: e8                  ppu.DATA = cpu.A    
-            cpx #$20           ; $c050: e0 20               x++
-            bne __c049         ; $c052: d0 f5           } while (cpu.X != 0x20)
+
+__c049:     lda __ff78,x       ; $c049: bd 78 ff        cpu.A = $0xFF78 + cpu.X    // Load into cpu.A the contents located at addess $0xFF78 + cpu.X
+            sta PPUDATA        ; $c04c: 8d 07 20        ppu.DATA = cpu.A
+            inx                ; $c04f: e8              cpu.X++
+            cpx #$20           ; $c050: e0 20           cpu.X == 0x20
+            bne __c049         ; $c052: d0 f5           if result of comparison is non zero, go to __c049
+
+                                                        ; ----- alternative pseudo code
+                                                        ; do{
+                                                        ;     cpu.A = $0xFF78 + cpu.X 
+                                                        ;     ppu.DATA = cpu.A    
+                                                        ;     cpu.X++
+                                                        ; } while (cpu.X != 0x20)
+
 
             lda #$c0           ; $c054: a9 c0           cpu.A = 0xC0
-            sta JOY2           ; $c056: 8d 17 40        joypad2 = 0xC0                  // ??
+            sta JOY2           ; $c056: 8d 17 40        joypad2 = cpu.A                  // ??
             lda #$00           ; $c059: a9 00           cpu.A = 0x00
-            sta SND_CHN        ; $c05b: 8d 15 40        soudnChannel = 0x00             // ??
+            sta SND_CHN        ; $c05b: 8d 15 40        soudnChannel = cpu.A             // ??
             lda #$78           ; $c05e: a9 78           cpu.A = 0x78
-            sta $d0            ; $c060: 85 d0           write(0xD0, cpu.A)              // ??
+            sta $d0            ; $c060: 85 d0           write(0xD0, cpu.A)               // ??
             lda #$fb           ; $c062: a9 fb           cpu.A = 0xFB
             sta $d1            ; $c064: 85 d1           write(0xD1, cpu.A)
             lda #$7f           ; $c066: a9 7f           cpu.A = 0x7F
