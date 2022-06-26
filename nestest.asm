@@ -130,22 +130,22 @@ __c049:     lda __ff78,x       ; $c049: bd 78 ff        cpu.A = $0xFF78 + cpu.X 
             lda #$c0           ; $c054: a9 c0           cpu.A = 0xC0
             sta JOY2           ; $c056: 8d 17 40        joypad2 = cpu.A                  // ??
             lda #$00           ; $c059: a9 00           cpu.A = 0x00
-            sta SND_CHN        ; $c05b: 8d 15 40        soudnChannel = cpu.A             // ??
+            sta SND_CHN        ; $c05b: 8d 15 40        soundChannel = cpu.A             // ??
             lda #$78           ; $c05e: a9 78           cpu.A = 0x78
-            sta $d0            ; $c060: 85 d0           write(0xD0, cpu.A)               // ??
+            sta $d0            ; $c060: 85 d0           write($0xD0, cpu.A)              // ??
             lda #$fb           ; $c062: a9 fb           cpu.A = 0xFB
-            sta $d1            ; $c064: 85 d1           write(0xD1, cpu.A)
+            sta $d1            ; $c064: 85 d1           write($0xD1, cpu.A)              // ??
             lda #$7f           ; $c066: a9 7f           cpu.A = 0x7F
-            sta $d3            ; $c068: 85 d3           write(0xD3, cpu.A)
+            sta $d3            ; $c068: 85 d3           write($0xD3, cpu.A)              // ??
             ldy #$00           ; $c06a: a0 00           .
             sty PPUADDR        ; $c06c: 8c 06 20        .
             sty PPUADDR        ; $c06f: 8c 06 20        ppu.ADDR = 0x0000               // Set pattern table address
 __c072:     lda #$00           ; $c072: a9 00           cpu.A = 0x00
-            sta $d7            ; $c074: 85 d7           write(0xD7, cpu.A)
+            sta $d7            ; $c074: 85 d7           write($0xD7, cpu.A)             // ??
             lda #$07           ; $c076: a9 07           cpu.A = 0x07
-            sta $d0            ; $c078: 85 d0           write(0xD0, cpu.A)
+            sta $d0            ; $c078: 85 d0           write($0xD0, cpu.A)             // ??
             lda #$c3           ; $c07a: a9 c3           cpu.A = 0xC3
-            sta $d1            ; $c07c: 85 d1           write(0xD1, cpu.A)
+            sta $d1            ; $c07c: 85 d1           write($0xD1, cpu.A)             // ??
             jsr __c2a7         ; $c07e: 20 a7 c2        
 __c081:     jsr __c28d         ; $c081: 20 8d c2  
             ldx #$12           ; $c084: a2 12     
@@ -450,62 +450,61 @@ __c294:     lda #$00           ; $c294: a9 00
             rts                ; $c2a6: 60        
 
 ;-------------------------------------------------------------------------------
-__c2a7:     lda #$00           ; $c2a7: a9 00           cpu.A = 0x00
-            sta PPUCTRL        ; $c2a9: 8d 00 20        ppu.CTRL = cpu.A
-            sta PPUMASK        ; $c2ac: 8d 01 20        ppu.MASK = cpu.A
-            jsr clearScreen    ; $c2af: 20 ed c2        clearScreen()
-            lda #$20           ; $c2b2: a9 20           .
-            sta PPUADDR        ; $c2b4: 8d 06 20        .
-            ldy #$00           ; $c2b7: a0 00           .
-            sty PPUADDR        ; $c2b9: 8c 06 20            ppu.ADDR = 0x2000
-__c2bc:     ldx #$20           ; $c2bc: a2 20               cpu.X = 0x20
-__c2be:     lda ($d0),y                 ; $c2be: b1 d0      cpu.A = $0xD0 + cpu.Y
-            beq ppuForBckgRendering     ; $c2c0: f0 20      if (cpu.Zero) {
-                                                                ppuForBckgRendering()
-                                                            }
+;
+;-------------------------------------------------------------------------------
+__c2a7:     lda #$00                    ; $c2a7: a9 00           cpu.A = 0x00
+            sta PPUCTRL                 ; $c2a9: 8d 00 20        ppu.CTRL = cpu.A
+            sta PPUMASK                 ; $c2ac: 8d 01 20        ppu.MASK = cpu.A
+            jsr clearScreen             ; $c2af: 20 ed c2        clearScreen()
+            lda #$20                    ; $c2b2: a9 20           .
+            sta PPUADDR                 ; $c2b4: 8d 06 20        .
+            ldy #$00                    ; $c2b7: a0 00          cpu.Y = 0
+            sty PPUADDR                 ; $c2b9: 8c 06 20       ppu.ADDR = 0x2000  // Write in nametable
+__c2bc:     ldx #$20                    ; $c2bc: a2 20          cpu.X = 0x20 (32)
+__c2be:     lda ($d0),y                 ; $c2be: b1 d0          cpu.A = $0xD0 + cpu.Y
+            beq ppuForBckgRendering     ; $c2c0: f0 20          if cpu.Zero, go to ppuForBckgRendering
+            cmp #$ff                    ; $c2c2: c9 ff          cpu.A == 0xFF
+            beq __c2d3                  ; $c2c4: f0 0d          cpu.Zero go to __c2d3
 
-            cmp #$ff                    ; $c2c2: c9 ff      if (cpu.A == 0xFF) {
-                                                                cpu.Carry = true
-                                                                cpu.Zero = true
-                                                                cpu.NegativeFlag = (cpu.A - 0xFF) < 0
-                                                            }
-            beq __c2d3         ; $c2c4: f0 0d               if (cpu.Zero) {
-                                                                __c2d3()
-                                                            }
-            sta PPUDATA        ; $c2c6: 8d 07 20  
-            iny                ; $c2c9: c8        
-            bne __c2ce         ; $c2ca: d0 02     
-            inc $d1            ; $c2cc: e6 d1     
-__c2ce:     dex                ; $c2ce: ca        
-            bne __c2be         ; $c2cf: d0 ed     
-            beq __c2bc         ; $c2d1: f0 e9     
-__c2d3:     iny                ; $c2d3: c8              cpu.Y--
-            bne __c2d8         ; $c2d4: d0 02           if (cpu.Y > 0) {
-                                                            __c2d8()
-                                                        }
+            sta PPUDATA                         ; $c2c6: 8d 07 20  
+            iny                                 ; $c2c9: c8        
+            bne __c2ce                          ; $c2ca: d0 02     
+            inc $d1                             ; $c2cc: e6 d1     
+__c2ce:     dex                                 ; $c2ce: ca        
+            bne __c2be                          ; $c2cf: d0 ed     
+            beq __c2bc                          ; $c2d1: f0 e9     
+__c2d3:     iny                                 ; $c2d3: c8              cpu.Y++
+            bne render32TilesWithBlank          ; $c2d4: d0 02           if cpu.Y != 0 render32TilesWithBlank
 
-            inc $d1            ; $c2d6: e6 d1           
-__c2d8:     lda #$20           ; $c2d8: a9 20           cpu.A = 0x20
-            sta PPUDATA        ; $c2da: 8d 07 20        ppu.DATA = cpu.A
-            dex                ; $c2dd: ca              cpu.X--
-            bne __c2d8         ; $c2de: d0 f8           if (cpu.X > 0) {
-                                                            __c2d8()
-                                                        }        
-            beq __c2bc         ; $c2e0: f0 da     
+            inc $d1                             ; $c2d6: e6 d1           
+render32TilesWithBlank:     lda #$20           ; $c2d8: a9 20           cpu.A = 0x20
+                            sta PPUDATA        ; $c2da: 8d 07 20        ppu.DATA = cpu.A
+                            dex                ; $c2dd: ca              cpu.X--
+                            bne render32TilesWithBlank         ; $c2de: d0 f8           if (cpu.X > 0) {
+                                                                            render32TilesWithBlank()
+                                                                        }        
+                            beq __c2bc         ; $c2e0: f0 da     
+
+
+;-------------------------------------------------------------------------------
+; Setup PPU to Background rendering
+;-------------------------------------------------------------------------------
 ppuForBckgRendering:     lda #$80           ; $c2e2: a9 80           cpu.A = 0x80
-            sta PPUCTRL        ; $c2e4: 8d 00 20        ppu.CTRL = 0x80     //  generateNMIAtVBlank
-            lda #$0e           ; $c2e7: a9 0e           cpu.A = 0x0E
-            sta PPUMASK        ; $c2e9: 8d 01 20        ppu.MASK = 0x0E     //  showBackgroundLeftEdge
-                                                                            //  showSpritesLeftEdge
-                                                                            //  showBackground
+                         sta PPUCTRL        ; $c2e4: 8d 00 20        ppu.CTRL = 0x80     //  generateNMIAtVBlank
+                         lda #$0e           ; $c2e7: a9 0e           cpu.A = 0x0E
+                         sta PPUMASK        ; $c2e9: 8d 01 20        ppu.MASK = 0x0E     //  showBackgroundLeftEdge
+                                                                                         //  showSpritesLeftEdge
+                                                                                         //  showBackground
+             
+                         rts                ; $c2ec: 60              
 
-            rts                ; $c2ec: 60              
-
+;-------------------------------------------------------------------------------
+; Clear screen routine
 ;-------------------------------------------------------------------------------
 clearScreen:     lda #$20           ; $c2ed: a9 20           .
             sta PPUADDR        ; $c2ef: 8d 06 20        .
             lda #$00           ; $c2f2: a9 00           .
-            sta PPUADDR        ; $c2f4: 8d 06 20        ppu.ADDR = $0x2000
+            sta PPUADDR        ; $c2f4: 8d 06 20        ppu.ADDR = $0x2000 // let's write into name tables
             ldx #$1e           ; $c2f7: a2 1e           . 
             lda #$20           ; $c2f9: a9 20           . 
 __c2fb:     ldy #$20           ; $c2fb: a0 20           . 
